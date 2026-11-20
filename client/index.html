@@ -2,57 +2,40 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Xliilx - Вход</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #000; color: #fff; font-family: sans-serif; overflow: hidden; height: 100vh; display: flex; justify-content: center; align-items: center; }
-        canvas { position: absolute; top: 0; left: 0; z-index: 1; }
-        .login-box { position: relative; z-index: 2; background: rgba(20, 20, 20, 0.9); padding: 40px; border-radius: 10px; text-align: center; width: 340px; border: 1px solid #333; box-shadow: 0 0 30px rgba(230, 57, 70, 0.2); }
-        h1 { color: #e63946; font-size: 36px; letter-spacing: 5px; margin-bottom: 20px; text-shadow: 0 0 10px #e63946; }
-        input, select { width: 100%; padding: 12px; margin-bottom: 15px; background: #111; border: 1px solid #444; color: #fff; border-radius: 5px; outline: none; }
-        input:focus, select:focus { border-color: #e63946; }
-        button { width: 100%; padding: 14px; margin-bottom: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
+        canvas#sparks { position: absolute; top: 0; left: 0; z-index: 1; }
+        .login-box { position: relative; z-index: 2; background: rgba(20, 20, 20, 0.9); padding: 30px; border-radius: 10px; text-align: center; width: 320px; border: 1px solid #333; box-shadow: 0 0 30px rgba(230, 57, 70, 0.2); }
+        h1 { color: #e63946; font-size: 32px; letter-spacing: 4px; margin-bottom: 20px; text-shadow: 0 0 10px #e63946; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; background: #111; border: 1px solid #444; color: #fff; border-radius: 5px; outline: none; font-size: 16px; }
+        button { width: 100%; padding: 12px; margin-bottom: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; }
         .btn-red { background: #e63946; color: #fff; }
-        .btn-red:hover { background: #ff4d5a; }
         .btn-google { background: #fff; color: #333; }
-        .btn-google:hover { background: #ddd; }
         .tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid #444; }
         .tab { flex: 1; padding: 10px; cursor: pointer; color: #888; }
         .tab.active { color: #fff; border-bottom: 2px solid #e63946; }
         .form { display: none; }
         .form.active { display: block; }
-        .error { color: #e63946; font-size: 13px; margin-bottom: 10px; height: 18px; }
     </style>
 </head>
 <body>
     <canvas id="sparks"></canvas>
-
     <div class="login-box">
         <h1>XLIILX</h1>
         <div class="tabs">
             <div class="tab active" onclick="switchTab('guest')">Гость</div>
             <div class="tab" onclick="switchTab('google')">Google</div>
         </div>
-
         <div id="form-guest" class="form active">
             <input type="text" id="guest-nick" placeholder="Никнейм">
             <input type="password" id="guest-pass" placeholder="Пароль">
-            <select id="guest-team">
-                <option value="CT">За CT (M4A1 + USP)</option>
-                <option value="T">За T (AKR + Glock)</option>
-            </select>
-            <div class="error" id="error-msg"></div>
             <button class="btn-red" onclick="loginGuest()">Войти</button>
         </div>
-
         <div id="form-google" class="form">
-            <p style="margin-bottom:15px; font-size:14px; color:#aaa;">Постоянный аккаунт</p>
             <input type="text" id="google-nick" placeholder="Придумай ник">
-            <select id="google-team">
-                <option value="CT">За CT (M4A1 + USP)</option>
-                <option value="T">За T (AKR + Glock)</option>
-            </select>
-            <div class="error" id="error-msg-g"></div>
             <button class="btn-google" onclick="loginGoogle()">Войти через Google</button>
         </div>
     </div>
@@ -73,32 +56,21 @@
         async function loginGuest() {
             const u = document.getElementById('guest-nick').value;
             const p = document.getElementById('guest-pass').value;
-            const team = document.getElementById('guest-team').value;
-            if (!u || !p) return showErr('Заполни все поля');
-            const res = await fetch('/api/guest', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: u, password: p })
-            });
+            if (!u || !p) return alert('Заполни все поля');
+            const res = await fetch('/api/guest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: p }) });
             const data = await res.json();
-            if (data.error) return showErr(data.error);
-            window.location.href = '/game.html?nick=' + encodeURIComponent(data.username) + '&team=' + team;
+            if (data.error) return alert(data.error);
+            window.location.href = '/lobby.html?nick=' + encodeURIComponent(data.username);
         }
 
         async function loginGoogle() {
             const u = document.getElementById('google-nick').value;
-            const team = document.getElementById('google-team').value;
-            if (!u) return showErrG('Введи ник');
-            const res = await fetch('/api/google', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: u })
-            });
+            if (!u) return alert('Введи ник');
+            const res = await fetch('/api/google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u }) });
             const data = await res.json();
-            if (data.error) return showErrG(data.error);
-            window.location.href = '/game.html?nick=' + encodeURIComponent(data.username) + '&team=' + team;
+            if (data.error) return alert(data.error);
+            window.location.href = '/lobby.html?nick=' + encodeURIComponent(data.username);
         }
-
-        function showErr(msg) { document.getElementById('error-msg').textContent = msg; }
-        function showErrG(msg) { document.getElementById('error-msg-g').textContent = msg; }
 
         // Искры
         const canvas = document.getElementById('sparks');
@@ -107,11 +79,7 @@
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
         window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
         class Spark {
-            constructor() {
-                this.x = Math.random() * canvas.width; this.y = canvas.height + Math.random() * 100;
-                this.size = Math.random() * 2 + 1; this.speedY = Math.random() * 2 + 1;
-                this.speedX = (Math.random() - 0.5) * 1; this.opacity = Math.random() * 0.5 + 0.5;
-            }
+            constructor() { this.x = Math.random() * canvas.width; this.y = canvas.height + Math.random() * 100; this.size = Math.random() * 2 + 1; this.speedY = Math.random() * 2 + 1; this.speedX = (Math.random() - 0.5) * 1; this.opacity = Math.random() * 0.5 + 0.5; }
             update() { this.y -= this.speedY; this.x += this.speedX; if (this.y < 0) { this.y = canvas.height + 10; this.x = Math.random() * canvas.width; } }
             draw() { ctx.fillStyle = `rgba(230, 57, 70, ${this.opacity})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); }
         }
