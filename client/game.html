@@ -2,144 +2,280 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Xliilx - Игра</title>
+    <title>Xliilx - Игра 3D</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; }
-        canvas { display: block; cursor: crosshair; }
+        body { margin: 0; overflow: hidden; background: #000; cursor: crosshair; }
+        canvas { display: block; }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
+            background: rgba(255, 255, 255, 0.8); border-radius: 50%;
+            transform: translate(-50%, -50%); pointer-events: none;
+        }
     </style>
 </head>
 <body>
-    <canvas id="game"></canvas>
+    <div id="crosshair"></div>
+    
+    <!-- Подключаем Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        const canvas = document.getElementById('game');
-        const ctx = canvas.getContext('2d');
         
-        // Получаем ник из ссылки
-        const nick = new URLSearchParams(window.location.search).get('nick');
+        // Получаем данные из ссылки
+        const urlParams = new URLSearchParams(window.location.search);
+        const nick = urlParams.get('nick');
+        const team = urlParams.get('team') || 'CT';
+        
         if (!nick) window.location.href = '/';
 
-        let myId = null;
-        let players = {};
-        let bullets = [];
-        let mouse = { x: 0, y: 0 };
-        let keys = {};
+        // --- НАСТРОЙКА THREE.JS ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Небо (голубое)
+        scene.fog = new THREE.Fog(0x87CEEB, 20, 100); // Туман
 
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Освещение
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(10, 20, 10);
+        scene.add(dirLight);
+
+        // --- КАРТА (СТЕНЫ И ЯЩИКИ) ---
+        const map = new THREE.Group();
+        scene.add(map);
+
+        // Пол (плоскость)
+        const floorGeo = new THREE.PlaneGeometry(200, 200);
+        const floorMat = new THREE.MeshLambertMaterial({ color: 0x444444 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        map.add(floor);
+
+        // Функция создания стены
+        function createWall(x, z, width, height, depth) {
+            const geo = new THREE.BoxGeometry(width, height, depth);
+            const mat = new THREE.MeshLambertMaterial({ color: 0x888888 });
+            const wall = new THREE.Mesh(geo, mat);
+            wall.position.set(x, height / 2, z);
+            map.add(wall);
         }
-        window.addEventListener('resize', resize);
-        resize();
 
-        // Заходим в игру на сервере
-        socket.emit('joinGame', nick);
+        // Строим карту (лабиринт)
+        createWall(0, 10, 20, 5, 1); // Стена спереди
+        createWall(0, -10, 20, 5, 1); // Стена сзади
+        createWall(10, 0, 1, 5, 20); // Стена справа
+        createWall(-10, 0, 1, 5, 20); // Стена слева
+        createWall(0, 0, 4, 2, 4); // Ящик в центре
+        createWall(5, 5, 2, 4, 2); // Ящик поменьше
+
+        // --- ОРУЖИЕ ОТ ПЕРВОГО ЛИЦА ---
+        const weaponGroup = new THREE.Group();
+        camera.add(weaponGroup);
+        scene.add(camera);
+
+        // Создаем модель оружия (просто брусок для простоты)
+        const gunGeo = new THREE.BoxGeometry(0.1, 0.1, 0.6);
+        const gunMat = new THREE.MeshLambertMaterial({ color: 0x222222 }); // Темный металл
+        const gun = new THREE.Mesh(gunGeo, gunMat);
+        
+        // Позиция оружия на экране (справа внизу)
+        gun.position.set(0.3, -0.3, -0.5);
+        weaponGroup.add(gun);
+
+        // --- ИГРОКИ (ДРУГИЕ) ---
+        let players = {};
+        let myId = null;
+
+        // Создание 3D модели игрока
+        function createPlayerModel(username, team) {
+            const group = new THREE.Group();
+            
+            // Тело (капсула)
+            const bodyGeo = new THREE.CapsuleGeometry(0.3, 1, 4, 8);
+            const color = team === 'CT' ? 0x0000ff : 0xff0000; // Синий для CT, Красный для T
+            const bodyMat = new THREE.MeshLambertMaterial({ color: color });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 1; // Поднимаем над полом
+            group.add(body);
+
+            // Никнейм над головой (спрайт с текстом)
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fff'; ctx.font = '24px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(username, 128, 40);
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.position.y = 2.2;
+            sprite.scale.set(2, 0.5, 1);
+            group.add(sprite);
+
+            return group;
+        }
+
+        // --- УПРАВЛЕНИЕ ---
+        const keys = {};
+        let yaw = 0; // Поворот камеры по горизонтали
+        let pitch = 0; // Поворот по вертикали
+        let playerPos = new THREE.Vector3(0, 1.6, 0); // Позиция глаз игрока
+
+        document.addEventListener('keydown', (e) => keys[e.code] = true);
+        document.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        // Захват мыши (Pointer Lock)
+        renderer.domElement.addEventListener('click', () => {
+            renderer.domElement.requestPointerLock();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement === renderer.domElement) {
+                yaw -= e.movementX * 0.002;
+                pitch -= e.movementY * 0.002;
+                // Ограничиваем взгляд вверх/вниз
+                pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+            }
+        });
+
+        // Стрельба
+        document.addEventListener('mousedown', (e) => {
+            if (e.button === 0 && document.pointerLockElement === renderer.domElement) {
+                // Анимация отдачи (оружие дергается)
+                gun.position.z = -0.4;
+                setTimeout(() => gun.position.z = -0.5, 50);
+                
+                // Отправляем на сервер
+                socket.emit('shoot', { x: playerPos.x, y: playerPos.y, z: playerPos.z, rotY: yaw });
+                
+                // Визуальный эффект выстрела (создаем линию)
+                createBulletEffect();
+            }
+        });
+
+        function createBulletEffect() {
+            // Просто временная линия от центра экрана
+            const geometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(0, 0, 0),
+                new THREE.Vector3(0, 0, -50)
+            ]);
+            const material = new THREE.LineBasicMaterial({ color: 0xffff00 });
+            const line = new THREE.Line(geometry, material);
+            camera.add(line);
+            setTimeout(() => camera.remove(line), 50);
+        }
+
+        // --- СЕТЬ ---
+        socket.emit('joinGame', { username: nick, team: team });
 
         socket.on('init', (data) => {
             myId = data.selfId;
-            players = data.players;
-        });
-
-        socket.on('playerJoined', (p) => players[p.id] = p);
-        socket.on('playerLeft', (id) => delete players[id]);
-        
-        socket.on('playerMoved', (data) => {
-            if (players[data.id]) {
-                players[data.id].x = data.x;
-                players[data.id].y = data.y;
-                players[data.id].angle = data.angle;
+            for (let id in data.players) {
+                if (id !== myId) {
+                    const p = data.players[id];
+                    const model = createPlayerModel(p.username, p.team);
+                    model.position.set(p.x, 0, p.z);
+                    scene.add(model);
+                    players[id] = { data: p, model: model };
+                }
             }
         });
 
-        socket.on('playerShot', (data) => {
-            bullets.push({
-                x: data.x, y: data.y, 
-                vx: Math.cos(data.angle) * 15, 
-                vy: Math.sin(data.angle) * 15, 
-                life: 60
-            });
+        socket.on('playerJoined', (p) => {
+            if (p.id !== myId) {
+                const model = createPlayerModel(p.username, p.team);
+                model.position.set(p.x, 0, p.z);
+                scene.add(model);
+                players[p.id] = { data: p, model: model };
+            }
         });
 
-        window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
-        window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
-        window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
-        window.addEventListener('mousedown', () => shoot());
+        socket.on('playerMoved', (data) => {
+            if (players[data.id]) {
+                players[data.id].data.x = data.x;
+                players[data.id].data.z = data.z;
+                players[data.id].data.rotY = data.rotY;
+                // Плавное движение (интерполяция)
+                players[data.id].model.position.lerp(new THREE.Vector3(data.x, 0, data.z), 0.2);
+                players[data.id].model.rotation.y = data.rotY;
+            }
+        });
 
-        function shoot() {
-            if (!myId || !players[myId]) return;
-            const p = players[myId];
-            const angle = Math.atan2(mouse.y - p.y, mouse.x - p.x);
-            bullets.push({
-                x: p.x, y: p.y, 
-                vx: Math.cos(angle) * 15, 
-                vy: Math.sin(angle) * 15, 
-                life: 60
-            });
-            socket.emit('shoot', { x: p.x, y: p.y, angle: angle });
-        }
+        socket.on('playerLeft', (id) => {
+            if (players[id]) {
+                scene.remove(players[id].model);
+                delete players[id];
+            }
+        });
 
-        function loop() {
-            if (myId && players[myId]) {
-                const p = players[myId];
-                let dx = 0, dy = 0;
-                if (keys['w'] || keys['ц']) dy -= 5;
-                if (keys['s'] || keys['ы']) dy += 5;
-                if (keys['a'] || keys['ф']) dx -= 5;
-                if (keys['d'] || keys['в']) dx += 5;
+        // --- ГЛАВНЫЙ ЦИКЛ ---
+        let lastTime = performance.now();
 
-                if (dx !== 0 || dy !== 0) {
-                    p.x += dx;
-                    p.y += dy;
-                    p.angle = Math.atan2(mouse.y - p.y, mouse.x - p.x);
-                    socket.emit('move', { x: p.x, y: p.y, angle: p.angle });
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = performance.now();
+            const delta = (time - lastTime) / 1000;
+            lastTime = time;
+
+            // Движение
+            const speed = 5 * delta;
+            let moveX = 0, moveZ = 0;
+
+            if (keys['KeyW']) moveZ -= 1;
+            if (keys['KeyS']) moveZ += 1;
+            if (keys['KeyA']) moveX -= 1;
+            if (keys['KeyD']) moveX += 1;
+
+            if (moveX !== 0 || moveZ !== 0) {
+                // Нормализация диагонали
+                const length = Math.sqrt(moveX * moveX + moveZ * moveZ);
+                moveX /= length;
+                moveZ /= length;
+
+                // Движение относительно взгляда
+                const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+                const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+
+                const nextPos = playerPos.clone()
+                    .add(forward.multiplyScalar(moveZ * speed))
+                    .add(right.multiplyScalar(moveX * speed));
+
+                // Простая коллизия (чтобы не проходить сквозь стены)
+                let canMove = true;
+                // Проверяем ящик в центре (примерные координаты)
+                if (Math.abs(nextPos.x) < 2.2 && Math.abs(nextPos.z) < 2.2) canMove = false;
+                
+                if (canMove) {
+                    playerPos.copy(nextPos);
+                    socket.emit('move', { x: playerPos.x, y: playerPos.y, z: playerPos.z, rotY: yaw });
                 }
             }
 
-            for (let i = bullets.length - 1; i >= 0; i--) {
-                bullets[i].x += bullets[i].vx;
-                bullets[i].y += bullets[i].vy;
-                bullets[i].life--;
-                if (bullets[i].life <= 0) bullets.splice(i, 1);
-            }
+            // Применяем позицию к камере
+            camera.position.copy(playerPos);
+            
+            // Применяем поворот камеры
+            camera.rotation.order = 'YXZ';
+            camera.rotation.y = yaw;
+            camera.rotation.x = pitch;
 
-            ctx.fillStyle = '#1a1a1a';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            ctx.strokeStyle = '#333';
-            for(let i=0; i<canvas.width; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
-            for(let i=0; i<canvas.height; i+=50) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
-
-            for (let id in players) {
-                const p = players[id];
-                ctx.fillStyle = (id === myId) ? '#00ff00' : '#ff0000';
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
-                ctx.fill();
-                
-                ctx.fillStyle = '#fff';
-                ctx.font = '14px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(p.username, p.x, p.y - 25);
-
-                ctx.strokeStyle = '#fff';
-                ctx.beginPath();
-                ctx.moveTo(p.x, p.y);
-                ctx.lineTo(p.x + Math.cos(p.angle) * 25, p.y + Math.sin(p.angle) * 25);
-                ctx.stroke();
-            }
-
-            ctx.fillStyle = '#ffff00';
-            for (let b of bullets) {
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            requestAnimationFrame(loop);
+            // Отрисовка
+            renderer.render(scene, camera);
         }
 
-        loop();
+        // Обработка ресайза
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
     </script>
 </body>
 </html>
