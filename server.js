@@ -9,7 +9,7 @@ const io = new Server(server, { cors: { origin: "*" } });
 app.use(express.json());
 app.use(express.static('client'));
 
-let users = [];
+let users = []; 
 
 app.post('/api/guest', (req, res) => {
     const { username, password } = req.body;
@@ -18,7 +18,7 @@ app.post('/api/guest', (req, res) => {
     if (user) {
         if (user.password !== password) return res.status(400).json({ error: 'Неверный пароль' });
     } else {
-        users.push({ username, password });
+        users.push({ username, password, type: 'guest' });
     }
     res.json({ username });
 });
@@ -32,8 +32,18 @@ app.post('/api/google', (req, res) => {
 let players = {};
 
 io.on('connection', (socket) => {
-    socket.on('joinGame', (username) => {
-        players[socket.id] = { id: socket.id, username, x: 400, y: 300, angle: 0 };
+    // Вход в игру с выбором команды (по умолчанию CT)
+    socket.on('joinGame', (data) => {
+        const team = data.team || 'CT'; 
+        players[socket.id] = { 
+            id: socket.id, 
+            username: data.username, 
+            team: team,
+            x: team === 'CT' ? 10 : -10, 
+            y: 1.6, // Высота глаз
+            z: team === 'CT' ? 10 : -10, 
+            rotY: 0 
+        };
         socket.emit('init', { selfId: socket.id, players });
         socket.broadcast.emit('playerJoined', players[socket.id]);
     });
@@ -42,7 +52,8 @@ io.on('connection', (socket) => {
         if (players[socket.id]) {
             players[socket.id].x = data.x;
             players[socket.id].y = data.y;
-            players[socket.id].angle = data.angle;
+            players[socket.id].z = data.z;
+            players[socket.id].rotY = data.rotY;
             socket.broadcast.emit('playerMoved', { id: socket.id, ...data });
         }
     });
@@ -59,10 +70,3 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log('Server started on ' + PORT));
-
-
-
-
-
-
-
