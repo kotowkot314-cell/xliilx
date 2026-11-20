@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Xliilx - Вход</title>
+    <style>
+        body { background: #111; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .box { background: #222; padding: 30px; border-radius: 10px; text-align: center; width: 300px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; background: #333; border: 1px solid #555; color: #fff; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #e63946; color: #fff; border: none; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>XLIILX</h1>
+        <input type="text" id="nick" placeholder="Введи ник">
+        <button onclick="startGame()">Играть</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        function startGame() {
+            const nick = document.getElementById('nick').value.trim();
+            if (!nick) return alert('Введи ник!');
+            socket.emit('login', nick, (response) => {
+                if (response.success) {
+                    localStorage.setItem('nick', nick);
+                    window.location.href = '/game.html';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
