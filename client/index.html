@@ -9,8 +9,8 @@
         canvas { position: absolute; top: 0; left: 0; z-index: 1; }
         .login-box { position: relative; z-index: 2; background: rgba(20, 20, 20, 0.9); padding: 40px; border-radius: 10px; text-align: center; width: 340px; border: 1px solid #333; box-shadow: 0 0 30px rgba(230, 57, 70, 0.2); }
         h1 { color: #e63946; font-size: 36px; letter-spacing: 5px; margin-bottom: 20px; text-shadow: 0 0 10px #e63946; }
-        input { width: 100%; padding: 12px; margin-bottom: 15px; background: #111; border: 1px solid #444; color: #fff; border-radius: 5px; outline: none; }
-        input:focus { border-color: #e63946; }
+        input, select { width: 100%; padding: 12px; margin-bottom: 15px; background: #111; border: 1px solid #444; color: #fff; border-radius: 5px; outline: none; }
+        input:focus, select:focus { border-color: #e63946; }
         button { width: 100%; padding: 14px; margin-bottom: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
         .btn-red { background: #e63946; color: #fff; }
         .btn-red:hover { background: #ff4d5a; }
@@ -34,25 +34,30 @@
             <div class="tab" onclick="switchTab('google')">Google</div>
         </div>
 
-        <!-- Форма Гостя -->
         <div id="form-guest" class="form active">
             <input type="text" id="guest-nick" placeholder="Никнейм">
             <input type="password" id="guest-pass" placeholder="Пароль">
+            <select id="guest-team">
+                <option value="CT">За CT (M4A1 + USP)</option>
+                <option value="T">За T (AKR + Glock)</option>
+            </select>
             <div class="error" id="error-msg"></div>
-            <button class="btn-red" onclick="loginGuest()">Войти (30 дней)</button>
+            <button class="btn-red" onclick="loginGuest()">Войти</button>
         </div>
 
-        <!-- Форма Google -->
         <div id="form-google" class="form">
-            <p style="margin-bottom:15px; font-size:14px; color:#aaa;">Создай постоянный аккаунт (навсегда)</p>
+            <p style="margin-bottom:15px; font-size:14px; color:#aaa;">Постоянный аккаунт</p>
             <input type="text" id="google-nick" placeholder="Придумай ник">
+            <select id="google-team">
+                <option value="CT">За CT (M4A1 + USP)</option>
+                <option value="T">За T (AKR + Glock)</option>
+            </select>
             <div class="error" id="error-msg-g"></div>
             <button class="btn-google" onclick="loginGoogle()">Войти через Google</button>
         </div>
     </div>
 
     <script>
-        // Логика вкладок
         function switchTab(type) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.form').forEach(f => f.classList.remove('active'));
@@ -65,87 +70,53 @@
             }
         }
 
-        // API Запросы
         async function loginGuest() {
             const u = document.getElementById('guest-nick').value;
             const p = document.getElementById('guest-pass').value;
+            const team = document.getElementById('guest-team').value;
             if (!u || !p) return showErr('Заполни все поля');
-            
             const res = await fetch('/api/guest', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: u, password: p })
             });
             const data = await res.json();
             if (data.error) return showErr(data.error);
-            
-            // Переход в игру
-            window.location.href = '/game.html?nick=' + encodeURIComponent(data.username);
+            window.location.href = '/game.html?nick=' + encodeURIComponent(data.username) + '&team=' + team;
         }
 
         async function loginGoogle() {
             const u = document.getElementById('google-nick').value;
+            const team = document.getElementById('google-team').value;
             if (!u) return showErrG('Введи ник');
-
             const res = await fetch('/api/google', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: u })
             });
             const data = await res.json();
             if (data.error) return showErrG(data.error);
-
-            window.location.href = '/game.html?nick=' + encodeURIComponent(data.username);
+            window.location.href = '/game.html?nick=' + encodeURIComponent(data.username) + '&team=' + team;
         }
 
         function showErr(msg) { document.getElementById('error-msg').textContent = msg; }
         function showErrG(msg) { document.getElementById('error-msg-g').textContent = msg; }
 
-        // --- Эффект искр на фоне ---
+        // Искры
         const canvas = document.getElementById('sparks');
         const ctx = canvas.getContext('2d');
         let particles = [];
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        });
-
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
         class Spark {
             constructor() {
-                this.x = Math.random() * canvas.width;
-                this.y = canvas.height + Math.random() * 100;
-                this.size = Math.random() * 2 + 1;
-                this.speedY = Math.random() * 2 + 1;
-                this.speedX = (Math.random() - 0.5) * 1;
-                this.opacity = Math.random() * 0.5 + 0.5;
+                this.x = Math.random() * canvas.width; this.y = canvas.height + Math.random() * 100;
+                this.size = Math.random() * 2 + 1; this.speedY = Math.random() * 2 + 1;
+                this.speedX = (Math.random() - 0.5) * 1; this.opacity = Math.random() * 0.5 + 0.5;
             }
-            update() {
-                this.y -= this.speedY;
-                this.x += this.speedX;
-                if (this.y < 0) {
-                    this.y = canvas.height + 10;
-                    this.x = Math.random() * canvas.width;
-                }
-            }
-            draw() {
-                ctx.fillStyle = `rgba(230, 57, 70, ${this.opacity})`;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            update() { this.y -= this.speedY; this.x += this.speedX; if (this.y < 0) { this.y = canvas.height + 10; this.x = Math.random() * canvas.width; } }
+            draw() { ctx.fillStyle = `rgba(230, 57, 70, ${this.opacity})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); }
         }
-
         for (let i = 0; i < 100; i++) particles.push(new Spark());
-
-        function animate() {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // Шлейф
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            particles.forEach(p => { p.update(); p.draw(); });
-            requestAnimationFrame(animate);
-        }
+        function animate() { ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; ctx.fillRect(0, 0, canvas.width, canvas.height); particles.forEach(p => { p.update(); p.draw(); }); requestAnimationFrame(animate); }
         animate();
     </script>
 </body>
