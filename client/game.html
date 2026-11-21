@@ -174,7 +174,7 @@
         }
 
         let moveX = 0, moveZ = 0, yaw = 0, pitch = 0;
-        let playerPos = new THREE.Vector3(0, 1.6, 0);
+        let playerPos = new THREE.Vector3(team === 'CT' ? 120 : -120, 1.6, team === 'CT' ? 120 : -120);
         let isShooting = false, lastShot = 0;
 
         const zone = document.getElementById('joystick-zone');
