@@ -8,12 +8,10 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
         body { background: #111; color: #fff; height: 100vh; display: flex; overflow: hidden; }
         
-        /* Левая панель (Иконки) */
         .sidebar { width: 70px; background: #1a1a1a; border-right: 1px solid #333; display: flex; flex-direction: column; align-items: center; padding-top: 20px; gap: 30px; }
         .icon-btn { width: 40px; height: 40px; background: #333; border-radius: 8px; display: flex; justify-content: center; align-items: center; color: #888; font-size: 20px; cursor: pointer; }
         .icon-btn.active { background: #e63946; color: #fff; }
 
-        /* Центральная часть (Профиль) */
         .main-content { flex: 1; display: flex; padding: 20px; gap: 20px; }
         
         .profile-card { flex: 1; background: #222; border-radius: 12px; padding: 20px; border: 1px solid #333; position: relative; }
@@ -24,14 +22,13 @@
         
         .stats-bar { background: #111; padding: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border: 1px solid #333; }
         .progress-bar { flex: 1; height: 8px; background: #333; border-radius: 4px; margin: 0 15px; overflow: hidden; }
-        .progress-fill { height: 100%; background: #f4a261; width: 30%; }
+        .progress-fill { height: 100%; background: #f4a261; width: 0%; transition: width 0.3s; }
 
         .ranks { display: flex; gap: 10px; margin-top: 20px; }
         .rank-box { flex: 1; background: #1a1a1a; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #333; }
         .rank-box h3 { font-size: 14px; color: #888; margin-bottom: 5px; }
         .rank-box p { font-size: 18px; font-weight: bold; color: #fff; }
 
-        /* Правая часть (Кнопка Играть) */
         .right-panel { width: 300px; display: flex; flex-direction: column; gap: 20px; }
         .banner { flex: 1; background: linear-gradient(135deg, #e63946, #f4a261); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; justify-content: flex-end; }
         .banner h2 { font-size: 28px; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
@@ -39,7 +36,6 @@
         .play-btn { width: 100%; padding: 20px; background: #e63946; color: white; border: none; border-radius: 8px; font-size: 24px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .play-btn:hover { background: #ff4d5a; transform: scale(1.02); }
 
-        /* Мобильная адаптация */
         @media (max-width: 768px) {
             .main-content { flex-direction: column; overflow-y: auto; }
             .right-panel { width: 100%; }
@@ -61,25 +57,25 @@
                 <div class="avatar"></div>
                 <div class="user-info">
                     <h2 id="username-display">Загрузка...</h2>
-                    <p>ID: 250505048</p>
+                    <p id="id-display">ID: 000000</p>
                 </div>
             </div>
 
             <div class="stats-bar">
-                <span>Уровень 25</span>
-                <div class="progress-bar"><div class="progress-fill"></div></div>
-                <span>5788 / 15680</span>
+                <span>Уровень <span id="level-display">1</span></span>
+                <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+                <span><span id="exp-display">0</span> / 1000</span>
             </div>
 
             <div class="ranks">
                 <div class="rank-box">
                     <h3>СОРЕВНОВАТЕЛЬНЫЙ</h3>
-                    <p>THE LEGEND</p>
+                    <p>КАЛИБРОВКА</p>
                 </div>
                 <div class="ranks">
                     <div class="rank-box">
                         <h3>СОЮЗНИКИ</h3>
-                        <p>THE LEGEND</p>
+                        <p>КАЛИБРОВКА</p>
                     </div>
                 </div>
             </div>
@@ -97,9 +93,30 @@
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const nick = urlParams.get('nick');
+        const rawId = urlParams.get('id');
         if (!nick) window.location.href = '/';
         
+        const playerId = String(rawId).padStart(6, '0');
+        
         document.getElementById('username-display').innerText = nick;
+        document.getElementById('id-display').innerText = 'ID: ' + playerId;
+
+        let level = parseInt(localStorage.getItem('level_' + playerId)) || 1;
+        let exp = parseInt(localStorage.getItem('exp_' + playerId)) || 0;
+        
+        document.getElementById('level-display').innerText = level;
+        document.getElementById('exp-display').innerText = exp;
+        
+        const progress = (exp / 1000) * 100;
+        document.getElementById('progress-fill').style.width = progress + '%';
+
+        exp += 150;
+        if (exp >= 1000) {
+            level++;
+            exp = exp - 1000;
+        }
+        localStorage.setItem('level_' + playerId, level);
+        localStorage.setItem('exp_' + playerId, exp);
 
         function startGame() {
             window.location.href = `/game.html?nick=${encodeURIComponent(nick)}&team=CT`;
