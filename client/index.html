@@ -60,7 +60,7 @@
             const res = await fetch('/api/guest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: p }) });
             const data = await res.json();
             if (data.error) return alert(data.error);
-            window.location.href = '/lobby.html?nick=' + encodeURIComponent(data.username);
+            window.location.href = '/lobby.html?nick=' + encodeURIComponent(data.username) + '&id=' + data.id;
         }
 
         async function loginGoogle() {
@@ -69,10 +69,9 @@
             const res = await fetch('/api/google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u }) });
             const data = await res.json();
             if (data.error) return alert(data.error);
-            window.location.href = '/lobby.html?nick=' + encodeURIComponent(data.username);
+            window.location.href = '/lobby.html?nick=' + encodeURIComponent(data.username) + '&id=' + data.id;
         }
 
-        // Искры
         const canvas = document.getElementById('sparks');
         const ctx = canvas.getContext('2d');
         let particles = [];
