@@ -10,24 +10,33 @@ app.use(express.json());
 app.use(express.static('client'));
 
 let users = []; 
+let nextId = 1;
+
 app.post('/api/guest', (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Заполни все поля' });
     let user = users.find(u => u.username === username);
     if (user) {
         if (user.password !== password) return res.status(400).json({ error: 'Неверный пароль' });
+        res.json({ username, id: user.id });
     } else {
-        users.push({ username, password, type: 'guest' });
+        const newUser = { username, password, id: nextId++ };
+        users.push(newUser);
+        res.json({ username, id: newUser.id });
     }
-    res.json({ username });
 });
+
 app.post('/api/google', (req, res) => {
     const { username } = req.body;
     if (!username) return res.status(400).json({ error: 'Введи ник' });
-    res.json({ username });
+    let user = users.find(u => u.username === username);
+    if (!user) {
+        user = { username, id: nextId++ };
+        users.push(user);
+    }
+    res.json({ username, id: user.id });
 });
 
-// --- ИГРОВАЯ ЛОГИКА ---
 let players = {};
 let bomb = { planted: false, timer: 40, defusing: false };
 
@@ -54,46 +63,27 @@ io.on('connection', (socket) => {
         socket.broadcast.emit('playerShot', { id: socket.id, ...data });
     });
 
-    // Заложить бомбу (Т)
     socket.on('plantBomb', (pos) => {
         const p = players[socket.id];
         if (p && p.team === 'T' && !bomb.planted) {
-            bomb.planted = true;
-            bomb.timer = 40;
-            bomb.x = pos.x; bomb.z = pos.z;
+            bomb.planted = true; bomb.timer = 40; bomb.x = pos.x; bomb.z = pos.z;
             io.emit('bombPlanted', bomb);
-            
-            // Запускаем таймер
             const interval = setInterval(() => {
                 if (bomb.planted) {
-                    bomb.timer--;
-                    io.emit('bombTick', bomb.timer);
-                    if (bomb.timer <= 0) {
-                        clearInterval(interval);
-                        io.emit('gameOver', 'T'); // Террористы победили
-                        bomb.planted = false;
-                    }
-                } else {
-                    clearInterval(interval);
-                }
+                    bomb.timer--; io.emit('bombTick', bomb.timer);
+                    if (bomb.timer <= 0) { clearInterval(interval); io.emit('gameOver', 'T'); bomb.planted = false; }
+                } else clearInterval(interval);
             }, 1000);
         }
     });
 
-    // Обезвредить (КТ)
     socket.on('defuseBomb', () => {
         const p = players[socket.id];
         if (p && p.team === 'CT' && bomb.planted && !bomb.defusing) {
-            bomb.defusing = true;
-            io.emit('bombDefusing', true);
-            
+            bomb.defusing = true; io.emit('bombDefusing', true);
             setTimeout(() => {
-                if (bomb.defusing) {
-                    bomb.planted = false;
-                    bomb.defusing = false;
-                    io.emit('gameOver', 'CT'); // КТ победили
-                }
-            }, 5000); // 5 секунд на снятие
+                if (bomb.defusing) { bomb.planted = false; bomb.defusing = false; io.emit('gameOver', 'CT'); }
+            }, 5000);
         }
     });
 
